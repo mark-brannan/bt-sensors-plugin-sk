@@ -1008,9 +1008,9 @@ class BTSensor extends EventEmitter {
         this._currentValues[tag]=value
     }
 
-    _emit(tag, value){
+    emit(tag, value){
         super.emit(tag, value)
-        if (this.usingGATT()) //update last contact time only for GATT devices 
+        if (this.usingGATT()) //update last contact time only for GATT devices
                               //which do not receive propertyChanged events when connected
             this._lastContact=Date.now()
         this.setCurrentValue(tag,value)
