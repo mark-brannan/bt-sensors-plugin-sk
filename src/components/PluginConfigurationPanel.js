@@ -507,7 +507,7 @@ function devicesInDomain(domain){
           
           <Button  variant="contained" onClick={()=>{openInNewTab("https://github.com/naugehyde/bt-sensors-plugin-sk/tree/1.2.0-beta#configuration")}}>Documentation</Button>
           <Button variant="contained"  onClick={()=>{openInNewTab("https://github.com/naugehyde/bt-sensors-plugin-sk/issues/new/choose")}}>Report Issue</Button>
-          <Button variant="contained"  onClick={()=>{openInNewTab("https://discord.com/channels/1170433917761892493/1295425963466952725" )}}>Discord Thread</Button>
+          <Button variant="contained"  onClick={()=>{openInNewTab("https://discord.com/channels/1170433917761892493/1508145920917639358" )}}>Discord Channel</Button>
           <p></p>
           <p></p>
       </div>
