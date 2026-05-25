@@ -6,6 +6,7 @@ const _BitReader = require("./_BitReader.js");
 class VictronDCEnergyMeter extends VictronSensor{
     
      async init(){
+        
         await super.init()
         try {
         if (this.encryptionKey){
@@ -20,13 +21,13 @@ class VictronDCEnergyMeter extends VictronSensor{
         }
         switch(this.auxMode){
             case VC.AuxMode.STARTER_VOLTAGE:
-                this.addMetadatum('starterVoltage','V',  'starter battery voltage', 
+                this.addMetadatum('auxVoltage','V',  'auxiliary voltage', 
                         (buff,offset=0)=>{return buff.readInt16LE(offset)/100})
-                        .default="electrical.batteries.starter.voltage"
+                        .default="electrical.meters.{id}.auxVoltage"
                         break;
 
             case VC.AuxMode.TEMPERATURE:
-                this.addMetadatum('temperature','K','House battery temperature', 
+                this.addMetadatum('temperature','K','temperature', 
                     (buff,offset=0)=>{
                         const temp = buff.readUInt16LE(offset)
                         if (temp==0xffff) 
@@ -34,7 +35,7 @@ class VictronDCEnergyMeter extends VictronSensor{
                         else 
                             return temp / 100
                     })
-                    .default="electrical.batteries.house.temperature"
+                    .default="electrical.meters.{id}.temperature"
 
                     break;
             default:
@@ -77,9 +78,11 @@ class VictronDCEnergyMeter extends VictronSensor{
             default:
                 break
             } 
-
+        const br = new _BitReader(decData.subarray(8,11)) //current is packed into final 22 bytes
+        br.read_unsigned_int(2) //discard first two bytes (auxMode)
         this.emit("current", 
-            this.NaNif( new _BitReader(decData.subarray(8,11)).read_signed_int(22),0x3FFFFF)/1000)
+            this.NaNif( br.read_signed_int(22),0x3FFFFF)/1000
+        )
   
     }
     
