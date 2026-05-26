@@ -1137,8 +1137,7 @@ class BTSensor extends EventEmitter {
     elapsedTimeSinceLastContact(){
         if (this.device instanceof OutOfRangeDevice)
             return Infinity
-        else 
-            return (Date.now()-this?._lastContact??Date.now())/1000
+        return (Date.now() - (this._lastContact ?? Date.now())) / 1000
     }
 
     prepareConfig(config){
