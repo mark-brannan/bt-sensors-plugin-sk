@@ -378,7 +378,8 @@ class BTSensor extends EventEmitter {
 
     }
     async init(){
-        this.currentProperties = await this.constructor.getDeviceProps(this.device)
+        if (!this.currentProperties) // useful for testing fake device instances that set the currentProperties explicitly
+            this.currentProperties = await this.constructor.getDeviceProps(this.device)
         this.setState("INITIALIZING");
         await this.initSchema()
 
@@ -1137,9 +1138,7 @@ class BTSensor extends EventEmitter {
     elapsedTimeSinceLastContact(){
         if (this.device instanceof OutOfRangeDevice)
             return Infinity
-        if (this._lastContact === undefined)
-            return Infinity
-        return (Date.now() - this._lastContact) / 1000
+        return (Date.now() - (this._lastContact ?? Date.now())) / 1000
     }
 
     prepareConfig(config){
