@@ -378,7 +378,8 @@ class BTSensor extends EventEmitter {
 
     }
     async init(){
-        this.currentProperties = await this.constructor.getDeviceProps(this.device)
+        if (!this.currentProperties) // useful for testing fake device instances that set the currentProperties explicitly
+            this.currentProperties = await this.constructor.getDeviceProps(this.device)
         this.setState("INITIALIZING");
         await this.initSchema()
 
@@ -415,7 +416,7 @@ class BTSensor extends EventEmitter {
         this._active = true
         this._error = false
 
-        this._propertiesChanged(this.currentProperties)
+        this._propertiesChanged(this.currentProperties, false)
 
     }
 
@@ -972,9 +973,10 @@ class BTSensor extends EventEmitter {
      * @param {*} props which contains ManufacturerData and ServiceData (where the sensor's data resides)
      * set up by BTSensor::initPropertiesChanged()
      */
-    _propertiesChanged(props){
-        this._lastContact=Date.now()
-            
+    _propertiesChanged(props, live=true){
+        if (live)
+            this._lastContact=Date.now()
+
         if (props.RSSI) {
             this.currentProperties.RSSI=this.valueIfVariant(props.RSSI)
             this.emit("RSSI", this.currentProperties.RSSI) //tell any RSSI listeners of the new value
@@ -1008,9 +1010,9 @@ class BTSensor extends EventEmitter {
         this._currentValues[tag]=value
     }
 
-    _emit(tag, value){
+    emit(tag, value){
         super.emit(tag, value)
-        if (this.usingGATT()) //update last contact time only for GATT devices 
+        if (this.usingGATT()) //update last contact time only for GATT devices
                               //which do not receive propertyChanged events when connected
             this._lastContact=Date.now()
         this.setCurrentValue(tag,value)
@@ -1046,7 +1048,7 @@ class BTSensor extends EventEmitter {
             }
         }
         this.setState("ACTIVE")
-        this._propertiesChanged(this.currentProperties)
+        this._propertiesChanged(this.currentProperties, false)
     }
 
   /**
@@ -1136,8 +1138,7 @@ class BTSensor extends EventEmitter {
     elapsedTimeSinceLastContact(){
         if (this.device instanceof OutOfRangeDevice)
             return Infinity
-        else 
-            return (Date.now()-this?._lastContact??Date.now())/1000
+        return (Date.now() - (this._lastContact ?? Date.now())) / 1000
     }
 
     prepareConfig(config){
