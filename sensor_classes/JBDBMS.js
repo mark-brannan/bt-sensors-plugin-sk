@@ -124,6 +124,19 @@ class JBDBMS extends BTSensor {
         frontEndDetectionICError: (word & 0x0800) !== 0,
         softwareLockMOS:          (word & 0x1000) !== 0,
       };
+      const path = this.notificationPathFor("protectionStatus");
+      if (path) {
+        if (word === 0) {
+          this.emitNotification(path, null);
+        } else {
+          const active = Object.entries(status)
+            .filter(([, v]) => v)
+            .map(([k]) => k)
+            .join(", ");
+          this.emitNotification(path, "alert", active || `protectionStatus=0x${word.toString(16)}`);
+        }
+      }
+      return status;
     }).default = "electrical.batteries.{batteryID}.protectionStatus";
 
     this.addDefaultPath(
