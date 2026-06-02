@@ -124,7 +124,7 @@ class JikongBMS extends BTSensor {
     this.addParameter("dischargeFloor", {
       description: "Discharge floor ratio ",
       isRequired: true,
-      type: "number",
+      type: "ratio",
       default: 0.1,
       minimum: 0,
       max: 0.99,
@@ -184,7 +184,7 @@ class JikongBMS extends BTSensor {
 
     this.addMetadatum(
       "avgCellVoltage",
-      "number",
+      "V",
       "Average Cell Voltage",
       () => {
         return this.currentProperties._totalCellVoltage / this.numberOfCells;
@@ -193,7 +193,7 @@ class JikongBMS extends BTSensor {
 
     this.addMetadatum(
       "deltaCellVoltage",
-      "number",
+      "V",
       "Delta Cell Voltage",
       () => {
         return (
