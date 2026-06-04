@@ -1024,8 +1024,7 @@ class BTSensor extends EventEmitter {
          if (this._reachable===reachable) return
          this._reachable=reachable
          this.emit("reachable", reachable)
-		}
-    }
+	 }
     
     propertiesChanged(props){
         //implemented by subclass
