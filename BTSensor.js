@@ -376,6 +376,11 @@ class BTSensor extends EventEmitter {
         this.getPath("RSSI").read=()=>{return this.getRSSI()}
         this.getPath("RSSI").read.bind(this)
 
+		//create the 'reachable' path. Unlike RSSI it has no read function:
+		//its value is pushed by the contact hooks (see ::setReachable), not
+		//pulled from a data buffer, so ::emitValuesFrom must never touch it.
+		this.addDefaultPath("reachable","sensors.reachable")
+
     }
     async init(){
         if (!this.currentProperties) // useful for testing fake device instances that set the currentProperties explicitly
@@ -399,6 +404,20 @@ class BTSensor extends EventEmitter {
         this.unsetError()
 
         if (config.paths){
+
+		//Backfill paths added to the schema after this config was last
+		//saved. createPaths/initPaths only wire tags whose config.paths[tag]
+		//is defined, so a path absent from an older saved config would never
+		//get a listener. A key that is undefined (vs "") means the schema
+		//property did not exist at save time; an intentionally-blanked path
+		//is "" and is left untouched.
+		Object.keys(this.getPaths()).forEach((tag)=>{
+			if (config.paths[tag]===undefined){
+				const schemaDef=this.getPath(tag)
+				if (schemaDef && schemaDef.default!==undefined)
+					config.paths[tag]=schemaDef.default
+				}
+			})
             this.createPaths(config,plugin.id)
             this.initPaths(config,plugin.id)
             this.debug(`Paths activated for ${this.getDisplayName()}`);
@@ -986,8 +1005,26 @@ class BTSensor extends EventEmitter {
 
         if (props.ManufacturerData)
             this.currentProperties.ManufacturerData=this.valueIfVariant(props.ManufacturerData)
-        if (this.isActive())
+        if (this.isActive()){
+			if (live) this.setReachable(true)  //Set 'reachable' if device is live
             this.propertiesChanged(props)
+		}
+	}
+
+     /**
+     * Set the reachability state of the sensor and emit a "reachable" event
+     * only when it changes. Deduping here is required because the callers fire
+     * repeatedly: the no-contact health check (index.js) calls
+     * notify/clearNoContact() on every interval tick, and _propertiesChanged()
+     * fires on every advertisement. Without the guard each would push an
+     * identical SignalK delta on every tick/packet.
+     * @param {boolean} reachable
+     */
+     setReachable(reachable){
+         if (this._reachable===reachable) return
+         this._reachable=reachable
+         this.emit("reachable", reachable)
+		}
     }
     
     propertiesChanged(props){
@@ -1012,9 +1049,13 @@ class BTSensor extends EventEmitter {
 
     emit(tag, value){
         super.emit(tag, value)
-        if (this.usingGATT()) //update last contact time only for GATT devices
-                              //which do not receive propertyChanged events when connected
+        if (this.usingGATT()){ //update last contact time only for GATT devices which do not receive propertyChanged events when connected
             this._lastContact=Date.now()
+            //a GATT value emit == in contact. Guard the reachable tag itself,
+            //otherwise setReachable(false) would immediately be flipped back to
+            //true by its own emit.
+            if (tag!=="reachable") this.setReachable(true)
+        }			
         this.setCurrentValue(tag,value)
     }
 
@@ -1216,6 +1257,7 @@ class BTSensor extends EventEmitter {
         );
   }
  notifyNoContact(){
+	 	this.setReachable(false)
     	this._app.handleMessage('bt-sensors-plugin-sk', 
             {
                 updates: [{
@@ -1235,6 +1277,7 @@ class BTSensor extends EventEmitter {
         );
   }
    clearNoContact(){
+	    this.setReachable(true)
     	this._app.handleMessage('bt-sensors-plugin-sk', 
             {
                 updates: [{
