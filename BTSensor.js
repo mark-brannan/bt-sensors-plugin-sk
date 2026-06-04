@@ -1012,16 +1012,15 @@ class BTSensor extends EventEmitter {
 	}
 
      /**
-     * Set the reachability state of the sensor and emit a "reachable" event
-     * only when it changes. Deduping here is required because the callers fire
-     * repeatedly: the no-contact health check (index.js) calls
-     * notify/clearNoContact() on every interval tick, and _propertiesChanged()
-     * fires on every advertisement. Without the guard each would push an
-     * identical SignalK delta on every tick/packet.
+     * Set the reachability state of the sensor and emit a "reachable" event.
+     * Emits on every call (no change-only dedup) so the path's SignalK
+     * timestamp is refreshed at the device's contact cadence: every
+     * advertisement (_propertiesChanged), every GATT value emit (emit), and
+     * every no-contact health-check tick (notify/clearNoContact). _reachable
+     * is retained so callers can query the most recent state.
      * @param {boolean} reachable
      */
      setReachable(reachable){
-         if (this._reachable===reachable) return
          this._reachable=reachable
          this.emit("reachable", reachable)
 	 }
@@ -1048,13 +1047,14 @@ class BTSensor extends EventEmitter {
 
     emit(tag, value){
         super.emit(tag, value)
-        if (this.usingGATT()){ //update last contact time only for GATT devices which do not receive propertyChanged events when connected
+        if (this.usingGATT() && tag!=="reachable"){ 
+            //GATT devices get no PropertiesChanged while connected, so a value emit is their contact heartbeat.
+            //"reachable" is a status signal, not a data heartbeat: it must not
+            //refresh _lastContact (that would reset the no-contact clock and
+            //break detection) nor re-enter setReachable.
             this._lastContact=Date.now()
-            //a GATT value emit == in contact. Guard the reachable tag itself,
-            //otherwise setReachable(false) would immediately be flipped back to
-            //true by its own emit.
-            if (tag!=="reachable") this.setReachable(true)
-        }			
+            this.setReachable(true)
+        }
         this.setCurrentValue(tag,value)
     }
 
