@@ -1132,6 +1132,7 @@ class BTSensor extends EventEmitter {
 	}
 	updatePath(path, val, id, source){
 
+		if (val === undefined) return
 		this._app.handleMessage(id, {updates: [ { $source: source, values: [ { path: path, value: val }] } ] })
   	}  
 
