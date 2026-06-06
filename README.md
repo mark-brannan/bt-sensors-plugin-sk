@@ -1,7 +1,22 @@
 # Bluetooth Sensors for [Signal K](http://www.signalk.org) 
 
 ## WHAT'S NEW  
-# Version.1.3.8.beta7
+
+# Version 1.3.8.beta8
+
+- Add GitHub Actions workflow for NodeJS with Webpack
+- Create valid Signal K path names
+- Improve `emitAlarm` handling so null-clear is only sent after a prior alarm was emitted during the session
+- Fix reachable handling and add `reachable` path/property support
+- Add early return for undefined values in `updatePath`
+- Update JikongBMS voltage metadata
+- Fix current parsing in `VictronDCEnergyMeter`
+- Restore GATT contact heartbeat after `emit()` rename
+- Add Bluetooth adapter selection by MAC address
+- Mirror battery and inverter alarms to `notifications.*` per spec
+- Keep plugin alive with `MissingAdapter` when the configured adapter is missing
+
+# Version 1.3.8.beta7
 
 - multiple stability changes throughout with abundant thanks @nearlcrews (see PRs #142, #143, #144 #145 and #146)
 - WattCycle battery support (see PR #139) Kudos to @elliotmoso
