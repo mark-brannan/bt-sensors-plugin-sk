@@ -185,6 +185,11 @@
             "default":"sensors.{macAndName}.RSSI",
             "description": "Sensor signal strength in decibels"
         },
+        "reachable":
+        {
+            "default":"sensors.{macAndName}.reachable",
+            "description": "Whether the sensor is currently in Bluetooth contact (true/false)"
+        },        
         "batteryStrength":
         {
             "title": "Battery Strength",

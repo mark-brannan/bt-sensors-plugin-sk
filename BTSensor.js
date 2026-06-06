@@ -376,6 +376,11 @@ class BTSensor extends EventEmitter {
         this.getPath("RSSI").read=()=>{return this.getRSSI()}
         this.getPath("RSSI").read.bind(this)
 
+		//create the 'reachable' path. Unlike RSSI it has no read function:
+		//its value is pushed by the contact hooks (see ::setReachable), not
+		//pulled from a data buffer, so ::emitValuesFrom must never touch it.
+		this.addDefaultPath("reachable","sensors.reachable")
+
     }
     async init(){
         if (!this.currentProperties) // useful for testing fake device instances that set the currentProperties explicitly
@@ -399,6 +404,20 @@ class BTSensor extends EventEmitter {
         this.unsetError()
 
         if (config.paths){
+
+		//Backfill paths added to the schema after this config was last
+		//saved. createPaths/initPaths only wire tags whose config.paths[tag]
+		//is defined, so a path absent from an older saved config would never
+		//get a listener. A key that is undefined (vs "") means the schema
+		//property did not exist at save time; an intentionally-blanked path
+		//is "" and is left untouched.
+		Object.keys(this.getPaths()).forEach((tag)=>{
+			if (config.paths[tag]===undefined){
+				const schemaDef=this.getPath(tag)
+				if (schemaDef && schemaDef.default!==undefined)
+					config.paths[tag]=schemaDef.default
+				}
+			})
             this.createPaths(config,plugin.id)
             this.initPaths(config,plugin.id)
             this.debug(`Paths activated for ${this.getDisplayName()}`);
@@ -850,7 +869,9 @@ class BTSensor extends EventEmitter {
     macAndName(){
         if (this.getMacAddress()==null)
             this.debug(`macAndName called with null MAC address for ${this.getName()}`)
-        return `${this.getName().replaceAll(':', '-').replaceAll(" ","_")}-${this.getMacAddress().replaceAll(':', '-')}`
+        const name = this.getName().replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')
+        const mac = this.getMacAddress().replaceAll(':', '_')
+        return `${name}_${mac}`
     }
     getNameAndAddress(){
         return `${this.getName()} at ${this.getMacAddress()}`
@@ -986,9 +1007,25 @@ class BTSensor extends EventEmitter {
 
         if (props.ManufacturerData)
             this.currentProperties.ManufacturerData=this.valueIfVariant(props.ManufacturerData)
-        if (this.isActive())
+        if (this.isActive()){
+			if (live) this.setReachable(true)  //Set 'reachable' if device is live
             this.propertiesChanged(props)
-    }
+		}
+	}
+
+     /**
+     * Set the reachability state of the sensor and emit a "reachable" event.
+     * Emits on every call (no change-only dedup) so the path's SignalK
+     * timestamp is refreshed at the device's contact cadence: every
+     * advertisement (_propertiesChanged), every GATT value emit (emit), and
+     * every no-contact health-check tick (notify/clearNoContact). _reachable
+     * is retained so callers can query the most recent state.
+     * @param {boolean} reachable
+     */
+     setReachable(reachable){
+         this._reachable=reachable
+         this.emit("reachable", reachable)
+	 }
     
     propertiesChanged(props){
         //implemented by subclass
@@ -1012,9 +1049,14 @@ class BTSensor extends EventEmitter {
 
     emit(tag, value){
         super.emit(tag, value)
-        if (this.usingGATT()) //update last contact time only for GATT devices
-                              //which do not receive propertyChanged events when connected
+        if (this.usingGATT() && tag!=="reachable"){ 
+            //GATT devices get no PropertiesChanged while connected, so a value emit is their contact heartbeat.
+            //"reachable" is a status signal, not a data heartbeat: it must not
+            //refresh _lastContact (that would reset the no-contact clock and
+            //break detection) nor re-enter setReachable.
             this._lastContact=Date.now()
+            this.setReachable(true)
+        }
         this.setCurrentValue(tag,value)
     }
 
@@ -1132,6 +1174,7 @@ class BTSensor extends EventEmitter {
 	}
 	updatePath(path, val, id, source){
 
+		if (val === undefined) return
 		this._app.handleMessage(id, {updates: [ { $source: source, values: [ { path: path, value: val }] } ] })
   	}  
 
@@ -1166,7 +1209,7 @@ class BTSensor extends EventEmitter {
                 evalResult= evalResult.call(this)
             }
 
-            resultString += evalResult !== undefined ? evalResult.replace(/\s+/g,'_') : `${keyToAccess}_value_undefined`;
+            resultString += evalResult !== undefined ? evalResult.replace(/[^a-zA-Z0-9_]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'') : `${keyToAccess}_value_undefined`;
         } catch (error) {
             console.error(`Error accessing key '${keyToAccess}':`, error);
             resultString += fullMatch; // Keep the original curly braces on error
@@ -1215,6 +1258,7 @@ class BTSensor extends EventEmitter {
         );
   }
  notifyNoContact(){
+	 	this.setReachable(false)
     	this._app.handleMessage('bt-sensors-plugin-sk', 
             {
                 updates: [{
@@ -1234,6 +1278,7 @@ class BTSensor extends EventEmitter {
         );
   }
    clearNoContact(){
+	    this.setReachable(true)
     	this._app.handleMessage('bt-sensors-plugin-sk', 
             {
                 updates: [{

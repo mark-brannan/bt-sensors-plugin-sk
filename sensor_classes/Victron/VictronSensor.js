@@ -78,6 +78,8 @@ const VictronIdentifier = require('./VictronIdentifier.js');
     }
     emitAlarm(tag="alarm", alarm){
         if (alarm > 0) {
+            this._activeAlarms = (this._activeAlarms || new Set())
+            this._activeAlarms.add(tag)
             this.emit(
                  tag,
                 { message:this.alarmReasonText(alarm),
@@ -88,8 +90,13 @@ const VictronIdentifier = require('./VictronIdentifier.js');
         if (path) {
             if (alarm > 0)
                 this.emitNotification(path, "alert", this.alarmReasonText(alarm))
-            else
+            else if (this._activeAlarms?.has(tag)) {
+                // Only clear if we actually sent an alarm this session; avoids
+                // writing null to a notifications path that was never set,
+                // which some SignalK UIs display as "undefined: undefined".
+                this._activeAlarms.delete(tag)
                 this.emitNotification(path, null)
+            }
         }
     }
 
