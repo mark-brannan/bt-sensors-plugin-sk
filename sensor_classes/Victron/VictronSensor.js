@@ -178,6 +178,20 @@ const VictronIdentifier = require('./VictronIdentifier.js');
         try{
             const md = this.getManufacturerData(this.constructor.ManufacturerID)
             if (md && md.length && md[0]==0x10){
+                const iv = md.readUInt16LE(5)
+                const now = Date.now()
+                if (this._lastIV !== undefined) {
+                    // Reset IV tracking if device was absent long enough to have restarted
+                    const stale = !this._lastAdTime || (now - this._lastAdTime) > 30000
+                    if (!stale) {
+                        // Forward distance modulo 2^16; handles wraparound (65535→0 = delta 1)
+                        const delta = (iv - this._lastIV + 0x10000) & 0xFFFF
+                        // delta==0: duplicate; delta>0x8000: IV went backwards → garbage packet
+                        if (delta === 0 || delta > 0x8000) return
+                    }
+                }
+                this._lastIV = iv
+                this._lastAdTime = now
                 const decData=this.decrypt(md)
                 this.emitValuesFrom(decData)
             }
