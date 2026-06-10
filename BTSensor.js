@@ -1024,6 +1024,11 @@ class BTSensor extends EventEmitter {
      */
      setReachable(reachable){
          this._reachable=reachable
+         if (!reachable && this._registeredPaths) {
+             this._registeredPaths.forEach(({path, id, source}) =>
+                 this.updatePath(path, null, id, source)
+             )
+         }
          this.emit("reachable", reachable)
 	 }
     
@@ -1161,11 +1166,14 @@ class BTSensor extends EventEmitter {
 
 	 initPaths(deviceConfig, id){
         const source = this.getName()
+        this._registeredPaths = []
 		Object.keys(this.getPaths()).forEach((tag)=>{
             const pathMeta=this.getPath(tag)
 			const path = deviceConfig.paths[tag];
 			if (!(path === undefined)) {
                 let preparedPath =  this.preparePath(path)
+                if (tag !== "reachable")
+                    this._registeredPaths.push({ path: preparedPath, id, source })
                 this.on(tag, (val)=>{
 					this.updatePath(preparedPath,val, id, source)
                 })
