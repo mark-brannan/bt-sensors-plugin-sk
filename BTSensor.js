@@ -1024,13 +1024,15 @@ class BTSensor extends EventEmitter {
      */
      setReachable(reachable){
          this._reachable=reachable
-         if (!reachable && this._registeredPaths) {
+         this.emit("reachable", reachable)
+	 }
+
+     clearAllPaths(){
+         if (this._registeredPaths)
              this._registeredPaths.forEach(({path, id, source}) =>
                  this.updatePath(path, null, id, source)
              )
-         }
-         this.emit("reachable", reachable)
-	 }
+     }
     
     propertiesChanged(props){
         //implemented by subclass
@@ -1231,7 +1233,8 @@ class BTSensor extends EventEmitter {
   }
 
   notifyUnableToCommunicate(){
-    	this._app.handleMessage('bt-sensors-plugin-sk', 
+        this.clearAllPaths()
+    	this._app.handleMessage('bt-sensors-plugin-sk',
             {
                 updates: [{
                     $source: this.getName(),
@@ -1267,7 +1270,8 @@ class BTSensor extends EventEmitter {
   }
  notifyNoContact(){
 	 	this.setReachable(false)
-    	this._app.handleMessage('bt-sensors-plugin-sk', 
+        this.clearAllPaths()
+    	this._app.handleMessage('bt-sensors-plugin-sk',
             {
                 updates: [{
                     $source: this.getName(),
