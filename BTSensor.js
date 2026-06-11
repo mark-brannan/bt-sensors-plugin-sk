@@ -1291,7 +1291,10 @@ class BTSensor extends EventEmitter {
   }
    clearNoContact(){
 	    this.setReachable(true)
-    	this._app.handleMessage('bt-sensors-plugin-sk', 
+        const rssi = this.getRSSI()
+        if (Number.isFinite(rssi))
+            this.emit("RSSI", rssi)
+    	this._app.handleMessage('bt-sensors-plugin-sk',
             {
                 updates: [{
                     $source: this.getName(),

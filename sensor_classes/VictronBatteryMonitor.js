@@ -41,6 +41,10 @@ class VictronBatteryMonitor extends VictronSensor{
 
     characteristics=[]
 
+    // Byte 0 of BatteryMonitor decrypted data is the low byte of TTG, not device_state,
+    // so the base class 0xFF check would produce false positives. Skip it.
+    isDecryptedValid(decData){ return true }
+
     async initSchema(){
         await super.initSchema()
         this.addDefaultParam("batteryID").default="house"

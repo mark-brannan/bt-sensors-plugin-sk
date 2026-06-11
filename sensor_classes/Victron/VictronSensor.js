@@ -171,28 +171,35 @@ const VictronIdentifier = require('./VictronIdentifier.js');
     getName(){
         return `Victron ${this.getModelName()}`
     }
+    // Byte 0 of the decrypted payload is device_state for all advertising device types.
+    // 0xFF means "unavailable / powering off" per the Victron spec and should be discarded.
+    // VictronBatteryMonitor overrides this because its byte 0 is the TTG low byte, not state.
+    isDecryptedValid(decData){
+        return decData.length > 0 && decData[0] !== 0xFF
+    }
+
     propertiesChanged(props){
         super.propertiesChanged(props)
         if (this.usingGATT()) return
         if (!props.hasOwnProperty("ManufacturerData")) return
         try{
             const md = this.getManufacturerData(this.constructor.ManufacturerID)
-            if (md && md.length && md[0]==0x10){
+            if (md && md.length >= 8 && md[0]==0x10){
+                // Byte 7 is a plaintext copy of key[0]. Mismatch means wrong key or
+                // corrupted packet — discard before decrypting.
+                if (this.encryptionKey) {
+                    const key = Buffer.from(this.encryptionKey, 'hex')
+                    if (md[7] !== key[0]) return
+                }
                 const iv = md.readUInt16LE(5)
-                const now = Date.now()
+                // Drop exact duplicates (BlueZ can deliver the same advertisement twice)
                 if (this._lastIV !== undefined) {
-                    // Reset IV tracking if device was absent long enough to have restarted
-                    const stale = !this._lastAdTime || (now - this._lastAdTime) > 30000
-                    if (!stale) {
-                        // Forward distance modulo 2^16; handles wraparound (65535→0 = delta 1)
-                        const delta = (iv - this._lastIV + 0x10000) & 0xFFFF
-                        // delta==0: duplicate; delta>0x8000: IV went backwards → garbage packet
-                        if (delta === 0 || delta > 0x8000) return
-                    }
+                    const delta = (iv - this._lastIV + 0x10000) & 0xFFFF
+                    if (delta === 0) return
                 }
                 this._lastIV = iv
-                this._lastAdTime = now
                 const decData=this.decrypt(md)
+                if (!this.isDecryptedValid(decData)) return
                 this.emitValuesFrom(decData)
             }
         }
