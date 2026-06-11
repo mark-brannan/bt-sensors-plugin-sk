@@ -510,6 +510,8 @@ module.exports =   function (app) {
 					device.once("deviceFound",async (device)=>{
 						s.device=device
 						s.listen()
+						removeSensorFromList(s)
+						addSensorToList(s)
 						if (config.active) {
 							s.clearUnableToCommunicate()
 							await s.activate(config, plugin)
@@ -518,8 +520,6 @@ module.exports =   function (app) {
 							s.unsetError()
 							s.setState("DORMANT")
 						}
-						removeSensorFromList(s)
-						addSensorToList(s)
 					})
 					addSensorToList(s)
 					resolve(s)
