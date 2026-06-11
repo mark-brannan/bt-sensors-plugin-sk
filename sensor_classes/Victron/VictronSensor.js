@@ -102,18 +102,14 @@ const VictronIdentifier = require('./VictronIdentifier.js');
 
     _getOperationMode(buff, offset=0){
         const code = buff.readUInt8(offset)
-        return {
-            code: code,
-            message: VC.OperationMode.get(code)
-        }
+        if (code === 0xFF) return null
+        return {code: code, message: VC.OperationMode.get(code)}
     }
 
     _getChargerError(buff, offset=1){
         const code = buff.readUInt8(offset)
-        return {
-            code: code,
-            message: VC.ChargerError.get(code)
-        }
+        if (code === 0xFF) return null
+        return {code: code, message: VC.ChargerError.get(code)}
     }
    async init(){
         await super.init()
