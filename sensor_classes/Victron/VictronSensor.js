@@ -171,7 +171,11 @@ const VictronIdentifier = require('./VictronIdentifier.js');
     // 0xFF means "unavailable / powering off" per the Victron spec and should be discarded.
     // VictronBatteryMonitor overrides this because its byte 0 is the TTG low byte, not state.
     isDecryptedValid(decData){
-        return decData.length > 0 && decData[0] !== 0xFF
+        if (decData.length > 0 && decData[0] === 0xFF) {
+            this.debug(`Discarding packet from ${this.getDisplayName()}: device state 0xFF (unavailable/powering off)`)
+            return false
+        }
+        return true
     }
 
     propertiesChanged(props){
@@ -185,7 +189,10 @@ const VictronIdentifier = require('./VictronIdentifier.js');
                 // corrupted packet — discard before decrypting.
                 if (this.encryptionKey) {
                     const key = Buffer.from(this.encryptionKey, 'hex')
-                    if (md[7] !== key[0]) return
+                    if (md[7] !== key[0]) {
+                        this.debug(`Key mismatch for ${this.getDisplayName()}: check encryption key`)
+                        return
+                    }
                 }
                 const iv = md.readUInt16LE(5)
                 // Drop exact duplicates (BlueZ can deliver the same advertisement twice)
