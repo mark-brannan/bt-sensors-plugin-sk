@@ -866,10 +866,14 @@ class BTSensor extends EventEmitter {
         return name?name:"Unknown"
 
     }
+    sanitizePathKey(str) {
+        return str.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')
+    }
+
     macAndName(){
         if (this.getMacAddress()==null)
             this.debug(`macAndName called with null MAC address for ${this.getName()}`)
-        const name = this.getName().replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')
+        const name = this.sanitizePathKey(this.getName())
         const mac = this.getMacAddress().replaceAll(':', '_')
         return `${name}_${mac}`
     }
@@ -1219,7 +1223,7 @@ class BTSensor extends EventEmitter {
                 evalResult= evalResult.call(this)
             }
 
-            resultString += evalResult !== undefined ? evalResult.replace(/[^a-zA-Z0-9_]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'') : `${keyToAccess}_value_undefined`;
+            resultString += evalResult !== undefined ? this.sanitizePathKey(evalResult) : `${keyToAccess}_value_undefined`;
         } catch (error) {
             console.error(`Error accessing key '${keyToAccess}':`, error);
             resultString += fullMatch; // Keep the original curly braces on error
