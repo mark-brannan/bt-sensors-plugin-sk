@@ -1223,7 +1223,7 @@ class BTSensor extends EventEmitter {
                 evalResult= evalResult.call(this)
             }
 
-            resultString += evalResult !== undefined ? this.sanitizePathKey(evalResult) : `${keyToAccess}_value_undefined`;
+            resultString += evalResult !== undefined ? evalResult.replace(/\s+/g,'_') : `${keyToAccess}_value_undefined`;
         } catch (error) {
             console.error(`Error accessing key '${keyToAccess}':`, error);
             resultString += fullMatch; // Keep the original curly braces on error
