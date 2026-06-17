@@ -8,7 +8,8 @@
 - Clear all registered paths when a device becomes unreachable or out of contact.
 - Re-emit RSSI on reconnect and fix sensor-list ordering so RSSI updates flow.
 - Retry Bluetooth adapter acquisition instead of failing immediately.
-- Allow dashes in SK path names
+- Revert previous path name rewrite
+- Sanitize macAndName value only
 
 # Version 1.3.8.beta8
 
