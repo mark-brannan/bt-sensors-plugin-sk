@@ -19,7 +19,7 @@ class VictronSolarCharger extends VictronSensor{
         .default="electrical.solar.{id}.state"
     
         this.addMetadatum('chargerError','', 'charger error',
-            (buff)=>{return this._getChargerError(buff)})
+            (buff)=>{return this.getChargerError(buff)})
             .default="electrical.solar.{id}.error"
 
         this.addMetadatum('voltage','V', 'charger battery voltage', 
