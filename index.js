@@ -510,6 +510,8 @@ module.exports =   function (app) {
 					device.once("deviceFound",async (device)=>{
 						s.device=device
 						s.listen()
+						removeSensorFromList(s)
+						addSensorToList(s)
 						if (config.active) {
 							s.clearUnableToCommunicate()
 							await s.activate(config, plugin)
@@ -518,8 +520,6 @@ module.exports =   function (app) {
 							s.unsetError()
 							s.setState("DORMANT")
 						}
-						removeSensorFromList(s)
-						addSensorToList(s)
 					})
 					addSensorToList(s)
 					resolve(s)
@@ -746,11 +746,23 @@ module.exports =   function (app) {
 		if (!adapter){
 			plugin.debug(`Connecting to bluetooth adapter ${adapterID}`);
 
-			try {
-				adapter = await bluetooth.getAdapter(adapterID)
-			} catch (e) {
-				installMissingAdapter(`Bluetooth Adapter ${adapterID} not found: ${e.message}`)
-				return
+			const maxAttempts = 5
+			const retryDelay = 3000
+			for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+				try {
+					adapter = await bluetooth.getAdapter(adapterID)
+					break
+				} catch (e) {
+					if (attempt < maxAttempts) {
+						const msg = `Bluetooth adapter ${adapterID} not ready (attempt ${attempt}/${maxAttempts}), retrying in ${retryDelay/1000}s...`
+						plugin.debug(msg)
+						plugin.setStatusText(msg)
+						await new Promise(resolve => setTimeout(resolve, retryDelay))
+					} else {
+						installMissingAdapter(`Bluetooth Adapter ${adapterID} not found: ${e.message}`)
+						return
+					}
+				}
 			}
 
 			//Set up DBUS listener to monitor Powered status of current adapter

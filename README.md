@@ -2,9 +2,17 @@
 
 ## WHAT'S NEW  
 
+# Version 1.3.8.beta9
+- Discard invalid/garbage Victron advertisements (device-state 0xFF, key mismatch, duplicate IV).
+- Return null for Operation Mode / Charger Error when the code is 0xFF.
+- Clear all registered paths when a device becomes unreachable or out of contact.
+- Re-emit RSSI on reconnect and fix sensor-list ordering so RSSI updates flow.
+- Retry Bluetooth adapter acquisition instead of failing immediately.
+- Revert previous path name rewrite
+- Sanitize macAndName value only
+
 # Version 1.3.8.beta8
 
-- Add GitHub Actions workflow for NodeJS with Webpack
 - Create valid Signal K path names
 - Improve `emitAlarm` handling so null-clear is only sent after a prior alarm was emitted during the session
 - Fix reachable handling and add `reachable` path/property support

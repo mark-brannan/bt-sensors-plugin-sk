@@ -10,7 +10,7 @@ class VictronInverter extends VictronSensor{
         super.initSchema()
         this.addDefaultParam("id")
         this.addMetadatum('state','', 'inverter device state', 
-            (buff)=>{return this._getOperationMode(buff)}
+            (buff)=>{return this.getOperationMode(buff)}
         )
         .default="electrical.inverters.{id}.state"
 

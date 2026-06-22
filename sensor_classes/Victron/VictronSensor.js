@@ -100,21 +100,18 @@ const VictronIdentifier = require('./VictronIdentifier.js');
         }
     }
 
-    _getOperationMode(buff, offset=0){
+    getOperationMode(buff, offset=0){
         const code = buff.readUInt8(offset)
-        return {
-            code: code,
-            message: VC.OperationMode.get(code)
-        }
+        if (code === 0xFF) return null
+        return {code: code, message: VC.OperationMode.get(code)}
     }
 
-    _getChargerError(buff, offset=1){
+    getChargerError(buff, offset=1){
         const code = buff.readUInt8(offset)
-        return {
-            code: code,
-            message: VC.ChargerError.get(code)
-        }
+        if (code === 0xFF) return null
+        return {code: code, message: VC.ChargerError.get(code)}
     }
+
    async init(){
         await super.init()
         this.addParameter(
@@ -171,14 +168,46 @@ const VictronIdentifier = require('./VictronIdentifier.js');
     getName(){
         return `Victron ${this.getModelName()}`
     }
+    // Byte 0 of the decrypted payload is device_state for all advertising device types.
+    // 0xFF means "unavailable / powering off" per the Victron spec and should be discarded.
+    // VictronBatteryMonitor overrides this because its byte 0 is the TTG low byte, not state.
+    isDecryptedValid(decData){
+        if (decData.length > 0 && decData[0] === 0xFF) {
+            this.debug(`Discarding packet from ${this.getDisplayName()}: device state 0xFF (unavailable/powering off)`)
+            return false
+        }
+        return true
+    }
+
     propertiesChanged(props){
         super.propertiesChanged(props)
         if (this.usingGATT()) return
         if (!props.hasOwnProperty("ManufacturerData")) return
         try{
             const md = this.getManufacturerData(this.constructor.ManufacturerID)
-            if (md && md.length && md[0]==0x10){
+            if (md && md.length >= 8 && md[0]==0x10){
+                // Byte 7 is a plaintext copy of key[0]. Mismatch means wrong key or
+                // corrupted packet — discard before decrypting.
+                if (this.encryptionKey) {
+                    const key = Buffer.from(this.encryptionKey, 'hex')
+                    if (md[7] !== key[0]) {
+                        this.debug(`Key mismatch for ${this.getDisplayName()}: check encryption key`)
+                        this.emitKeyMismatchNotification()
+                        return
+                    }
+                }
+                // Clear key mismatch notification on successful packet
+                this.clearKeyMismatchNotification()
+
+                const iv = md.readUInt16LE(5)
+                // Drop exact duplicates (BlueZ can deliver the same advertisement twice)
+                if (this._lastIV !== undefined) {
+                    const delta = (iv - this._lastIV + 0x10000) & 0xFFFF
+                    if (delta === 0) return
+                }
+                this._lastIV = iv
                 const decData=this.decrypt(md)
+                if (!this.isDecryptedValid(decData)) return
                 this.emitValuesFrom(decData)
             }
         }
@@ -209,6 +238,28 @@ const VictronIdentifier = require('./VictronIdentifier.js');
    prepareConfig(config){
         super.prepareConfig(config)
         config.params.modelID=this.getModelID()
+        this.encryptionKey=config.params.encryptionKey
+    }
+
+    emitKeyMismatchNotification(){
+        if (this._keyMismatchNotified) return
+        this._keyMismatchNotified = true
+        this.clearAllPaths()
+        const path = `notifications.sensors.${this.macAndName()}`
+        this.emitNotification(path, "alert", `Encryption key mismatch for ${this.getDisplayName()}: verify configuration`)
+    }
+
+    clearKeyMismatchNotification(){
+        if (!this._keyMismatchNotified) return
+        this._keyMismatchNotified = false
+        const path = `notifications.sensors.${this.macAndName()}`
+        this.emitNotification(path, null)
+    }
+
+    // Override super and only clear notification if key matches
+    clearNoContact(){
+        if (this._keyMismatchNotified) return
+        super.clearNoContact()
     }
 
 }

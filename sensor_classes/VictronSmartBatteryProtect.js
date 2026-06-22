@@ -26,13 +26,13 @@ class VictronSmartBatteryProtect extends VictronSensor{
         this.addDefaultParam("id")
 
         this.addMetadatum('deviceState','', 'device state', 
-            (buff)=>{return this._getOperationMode(buff)})
+            (buff)=>{return this.getOperationMode(buff)})
 
         this.addMetadatum('outputStatus','', 'output status', //TODO
             (buff)=>{return (buff.readUInt8(2))})
 
         this.addMetadatum('chargerError','', 'charger error', 
-            (buff)=>{return this._getChargerError(buff,3)})
+            (buff)=>{return this.getChargerError(buff,3)})
         this.addMetadatum('alarmReason','', 'alarm reason', 
             (buff)=>{return buff.readUInt16LE(4)})
         this.addMetadatum('warningReason','', 'warning reason', //TODO

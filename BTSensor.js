@@ -866,10 +866,14 @@ class BTSensor extends EventEmitter {
         return name?name:"Unknown"
 
     }
+    sanitizePathKey(str) {
+        return str.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')
+    }
+
     macAndName(){
         if (this.getMacAddress()==null)
             this.debug(`macAndName called with null MAC address for ${this.getName()}`)
-        const name = this.getName().replace(/[^a-zA-Z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')
+        const name = this.sanitizePathKey(this.getName())
         const mac = this.getMacAddress().replaceAll(':', '_')
         return `${name}_${mac}`
     }
@@ -1026,6 +1030,13 @@ class BTSensor extends EventEmitter {
          this._reachable=reachable
          this.emit("reachable", reachable)
 	 }
+
+     clearAllPaths(){
+         if (this._registeredPaths)
+             this._registeredPaths.forEach(({path, id, source}) =>
+                 this.updatePath(path, null, id, source)
+             )
+     }
     
     propertiesChanged(props){
         //implemented by subclass
@@ -1161,11 +1172,14 @@ class BTSensor extends EventEmitter {
 
 	 initPaths(deviceConfig, id){
         const source = this.getName()
+        this._registeredPaths = []
 		Object.keys(this.getPaths()).forEach((tag)=>{
             const pathMeta=this.getPath(tag)
 			const path = deviceConfig.paths[tag];
 			if (!(path === undefined)) {
                 let preparedPath =  this.preparePath(path)
+                if (tag !== "reachable")
+                    this._registeredPaths.push({ path: preparedPath, id, source })
                 this.on(tag, (val)=>{
 					this.updatePath(preparedPath,val, id, source)
                 })
@@ -1209,7 +1223,7 @@ class BTSensor extends EventEmitter {
                 evalResult= evalResult.call(this)
             }
 
-            resultString += evalResult !== undefined ? evalResult.replace(/[^a-zA-Z0-9_]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'') : `${keyToAccess}_value_undefined`;
+            resultString += evalResult !== undefined ? evalResult.replace(/\s+/g,'_') : `${keyToAccess}_value_undefined`;
         } catch (error) {
             console.error(`Error accessing key '${keyToAccess}':`, error);
             resultString += fullMatch; // Keep the original curly braces on error
@@ -1223,7 +1237,8 @@ class BTSensor extends EventEmitter {
   }
 
   notifyUnableToCommunicate(){
-    	this._app.handleMessage('bt-sensors-plugin-sk', 
+        this.clearAllPaths()
+    	this._app.handleMessage('bt-sensors-plugin-sk',
             {
                 updates: [{
                     $source: this.getName(),
@@ -1259,7 +1274,8 @@ class BTSensor extends EventEmitter {
   }
  notifyNoContact(){
 	 	this.setReachable(false)
-    	this._app.handleMessage('bt-sensors-plugin-sk', 
+        this.clearAllPaths()
+    	this._app.handleMessage('bt-sensors-plugin-sk',
             {
                 updates: [{
                     $source: this.getName(),
@@ -1279,7 +1295,10 @@ class BTSensor extends EventEmitter {
   }
    clearNoContact(){
 	    this.setReachable(true)
-    	this._app.handleMessage('bt-sensors-plugin-sk', 
+        const rssi = this.getRSSI()
+        if (Number.isFinite(rssi))
+            this.emit("RSSI", rssi)
+    	this._app.handleMessage('bt-sensors-plugin-sk',
             {
                 updates: [{
                     $source: this.getName(),
