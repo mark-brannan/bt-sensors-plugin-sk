@@ -2,6 +2,9 @@
 
 ## WHAT'S NEW  
 
+# Version 1.3.8.beta10
+- Add Cyclops Marine Smartload Bluetooth load sensor support.
+
 # Version 1.3.8.beta9
 - Discard invalid/garbage Victron advertisements (device-state 0xFF, key mismatch, duplicate IV).
 - Return null for Operation Mode / Charger Error when the code is 0xFF.
@@ -254,6 +257,11 @@ It's pretty easy to write and deploy your own sensor class for any currently uns
 |--------------|----------|
 | [Gobius](https://gobiusc.com/) | Gobius-C Tank level sensor|
 | [Mopeka](https://www.mopeka.com) | [Mopeka Pro Chek](https://mopeka.com/product-category/recreational-sensors-rv-bbq-etc/) ultrasonic tank level sensor  |
+
+### Load
+| Manufacturer |  Devices |
+|--------------|----------|
+| [Cyclops Marine](https://www.cyclopsmarine.com/) | Smartload Bluetooth load sensor |
 
 ### Propulsion
 | Manufacturer |  Devices | 
