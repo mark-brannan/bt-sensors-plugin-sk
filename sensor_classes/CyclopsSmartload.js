@@ -17,7 +17,7 @@ function tonnesToKg(tonnes){
 
 class CyclopsSmartload extends BTSensor{
     static Domain = BTSensor.SensorDomains.load
-    static Manufacturer = "Cyclops Marine"
+    static Manufacturer = "Cyclops Marine / Mantracourt Electronics Limited"
     static manufacturerID = 0x04c3
     static dataServiceUUID = "0000ffb0-0000-1000-8000-00805f9b34fb"
     static advertisementProtocol = 0x01
@@ -55,27 +55,62 @@ class CyclopsSmartload extends BTSensor{
     }
 
     static normalizeAdvertisement(buffer){
-        if (!buffer || buffer.length < 11)
-            return null;
-
-        if (buffer.length >= 13 &&
-            buffer[0] == FULL_MANUFACTURER_ID[0] &&
-            buffer[1] == FULL_MANUFACTURER_ID[1] &&
-            buffer[2] == this.advertisementProtocol) {
-            return buffer.subarray(0, 13);
-        }
-
-        if (buffer[0] == this.advertisementProtocol)
-            return Buffer.concat([FULL_MANUFACTURER_ID, buffer.subarray(0, 11)]);
-
-        return null;
+        const candidates = this.advertisementCandidates(buffer);
+        return candidates.length > 0 ? candidates[0] : null;
     }
 
-    static decodeAdvertisement(buffer){
-        const normalized = this.normalizeAdvertisement(buffer);
+    static advertisementCandidates(buffer){
+        if (!buffer || buffer.length < this.advertisementKey.length)
+            return [];
+
+        buffer = Buffer.from(buffer);
+
+        const candidates = [];
+
+        if (buffer.length >= 13) {
+            for (let offset = 0; offset <= buffer.length - 13; offset++) {
+                if (buffer[offset] == FULL_MANUFACTURER_ID[0] &&
+                    buffer[offset + 1] == FULL_MANUFACTURER_ID[1] &&
+                    buffer[offset + 2] == this.advertisementProtocol) {
+                    candidates.push(buffer.subarray(offset, offset + 13));
+                }
+            }
+        }
+
+        if (buffer.length >= 11) {
+            for (let offset = 0; offset <= buffer.length - 11; offset++) {
+                if (buffer[offset] == this.advertisementProtocol) {
+                    candidates.push(
+                        Buffer.concat([FULL_MANUFACTURER_ID, buffer.subarray(offset, offset + 11)])
+                    );
+                }
+            }
+        }
+
+        if (buffer.length >= this.advertisementKey.length) {
+            for (let offset = 0; offset <= buffer.length - this.advertisementKey.length; offset++) {
+                candidates.push(
+                    Buffer.concat([
+                        FULL_MANUFACTURER_ID,
+                        Buffer.from([this.advertisementProtocol]),
+                        buffer.subarray(offset, offset + this.advertisementKey.length)
+                    ])
+                );
+            }
+        }
+
+        return candidates;
+    }
+
+    static decodeNormalizedAdvertisement(normalized){
         if (!normalized)
             return null;
 
+        return this.decodeFullyObfuscatedAdvertisement(normalized) ??
+            this.decodeTailObfuscatedAdvertisement(normalized);
+    }
+
+    static decodeFullyObfuscatedAdvertisement(normalized){
         const decoded = Buffer.alloc(this.advertisementKey.length);
         const encoded = normalized.subarray(3, 13);
         for (let i = 0; i < this.advertisementKey.length; i++)
@@ -96,6 +131,39 @@ class CyclopsSmartload extends BTSensor{
             tonnes,
             kg: tonnesToKg(tonnes)
         };
+    }
+
+    static decodeTailObfuscatedAdvertisement(normalized){
+        const dataTag = normalized.readUInt16BE(3);
+        const encoded = normalized.subarray(5, 13);
+        const key = this.advertisementKey.subarray(2);
+        const decoded = Buffer.alloc(key.length);
+        for (let i = 0; i < key.length; i++)
+            decoded[i] = encoded[i] ^ key[i];
+
+        const duplicateDataTag = decoded.readUInt16BE(6);
+        if (dataTag != duplicateDataTag)
+            return null;
+
+        const tonnes = decoded.readFloatBE(2);
+        return {
+            manufacturerID: normalized.readUInt16LE(0),
+            protocol: normalized.readUInt8(2),
+            dataTag,
+            status: decoded.readUInt8(0),
+            units: decoded.readUInt8(1),
+            tonnes,
+            kg: tonnesToKg(tonnes)
+        };
+    }
+
+    static decodeAdvertisement(buffer){
+        for (const normalized of this.advertisementCandidates(buffer)) {
+            const reading = this.decodeNormalizedAdvertisement(normalized);
+            if (reading)
+                return reading;
+        }
+        return null;
     }
 
     static decodeGATTLoad(buffer){
@@ -193,6 +261,38 @@ class CyclopsSmartload extends BTSensor{
         this.emitData("dataTag", reading);
     }
 
+    emitAdvertisedReadingsFromManufacturerData(manufacturerData){
+        if (!manufacturerData)
+            return;
+
+        const md = this.valueIfVariant(manufacturerData);
+        const orderedKeys = Object.keys(md).sort((a, b) => {
+            if (parseInt(a) == this.constructor.manufacturerID)
+                return -1;
+            if (parseInt(b) == this.constructor.manufacturerID)
+                return 1;
+            return 0;
+        });
+
+        for (const key of orderedKeys) {
+            const buffer = this.valueIfVariant(md[key]);
+            const reading = this.constructor.decodeAdvertisement(buffer);
+            if (reading) {
+                this.emitData("loadA", reading);
+                this.emitData("loadATonnes", reading);
+                this.emitData("status", reading.status);
+                this.emitData("statusText", reading.status);
+                this.emitData("dataTag", reading);
+                return;
+            }
+        }
+
+        const payloads = orderedKeys
+            .map((key)=>`${key}:${Buffer.from(this.valueIfVariant(md[key]) ?? []).toString("hex")}`)
+            .join(", ");
+        this.debug(`No valid Cyclops Smartload advertisement in ManufacturerData (${payloads})`);
+    }
+
     emitGATTLoad(channel, buffer){
         const reading = this.constructor.decodeGATTLoad(buffer);
         if (!reading)
@@ -272,8 +372,12 @@ class CyclopsSmartload extends BTSensor{
 
     propertiesChanged(props){
         super.propertiesChanged(props);
-        if (props.ManufacturerData)
-            this.emitAdvertisedReading(this.getManufacturerData(this.constructor.manufacturerID));
+        if (this.currentProperties.ManufacturerData)
+            this.emitAdvertisedReadingsFromManufacturerData(this.currentProperties.ManufacturerData);
+        else if (!this._missingManufacturerDataLogged) {
+            this.debug("Cyclops Smartload advertisement has no ManufacturerData yet.");
+            this._missingManufacturerDataLogged = true;
+        }
     }
 }
 

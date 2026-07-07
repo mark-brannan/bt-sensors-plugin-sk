@@ -15,6 +15,9 @@ const TRANSMITTED_ADVERTISEMENT = Buffer.from([
   0xa4, 0x6d, 0xd3, 0x4a, 0xb7, 0x18,
 ]);
 
+const SR10_ADVERTISEMENT_1 = Buffer.from("01bfab6c65a21b5bc6a9de", "hex");
+const SR10_ADVERTISEMENT_2 = Buffer.from("01bfab6c65a20c9b91a9de", "hex");
+
 test("isSmartloadName: matches documented and observed BLE names", () => {
   assert.equal(CyclopsSmartload.isSmartloadName("Cyc12345"), true);
   assert.equal(CyclopsSmartload.isSmartloadName("Smart Load Two"), true);
@@ -38,6 +41,47 @@ test("decodeAdvertisement: decodes PDF manufacturer-data example", () => {
 test("decodeAdvertisement: accepts BlueZ payload without manufacturer id bytes", () => {
   const bluezPayload = TRANSMITTED_ADVERTISEMENT.subarray(2);
   const reading = CyclopsSmartload.decodeAdvertisement(bluezPayload);
+
+  assert.ok(reading);
+  assert.equal(reading.dataTag, 0xa16d);
+  assert.ok(Math.abs(reading.tonnes - -0.00239193) < 0.00000001);
+});
+
+test("decodeAdvertisement: accepts obfuscated body without manufacturer or protocol bytes", () => {
+  const bodyPayload = TRANSMITTED_ADVERTISEMENT.subarray(3);
+  const reading = CyclopsSmartload.decodeAdvertisement(bodyPayload);
+
+  assert.ok(reading);
+  assert.equal(reading.dataTag, 0xa16d);
+  assert.ok(Math.abs(reading.tonnes - -0.00239193) < 0.00000001);
+});
+
+test("decodeAdvertisement: decodes live SR10 payloads with plain first data tag", () => {
+  const reading1 = CyclopsSmartload.decodeAdvertisement(SR10_ADVERTISEMENT_1);
+  const reading2 = CyclopsSmartload.decodeAdvertisement(SR10_ADVERTISEMENT_2);
+
+  assert.ok(reading1);
+  assert.equal(reading1.dataTag, 0xbfab);
+  assert.equal(reading1.status, 0);
+  assert.equal(reading1.units, 1);
+  assert.ok(Math.abs(reading1.tonnes - -0.0572) < 0.000001);
+  assert.ok(Math.abs(reading1.kg - -57.2) < 0.001);
+
+  assert.ok(reading2);
+  assert.equal(reading2.dataTag, 0xbfab);
+  assert.equal(reading2.status, 0);
+  assert.equal(reading2.units, 1);
+  assert.ok(Math.abs(reading2.tonnes - -0.0619) < 0.000001);
+  assert.ok(Math.abs(reading2.kg - -61.9) < 0.001);
+});
+
+test("decodeAdvertisement: finds payload inside surrounding bytes", () => {
+  const wrapped = Buffer.concat([
+    Buffer.from([0xaa, 0xbb]),
+    TRANSMITTED_ADVERTISEMENT,
+    Buffer.from([0xcc]),
+  ]);
+  const reading = CyclopsSmartload.decodeAdvertisement(wrapped);
 
   assert.ok(reading);
   assert.equal(reading.dataTag, 0xa16d);
