@@ -85,6 +85,7 @@ class BTSensor extends EventEmitter {
         electrical: { name: "electrical", description: "Electrical sensor - chargers, batteries, inverters etc."},
         propulsion: { name: "propulsion", description: "Sensors that measure engine state"},
         tanks: { name: "tanks", description: "Sensors that measure level in tanks (gas, propane, water etc.) "},
+        load: { name: "load", description: "Sensors that measure load, force, or tension"},
         beacons: { name: "beacons", description: "iBeacon/Eddystone sensor tags"}
     }
     static batteryStrengthTag="batteryStrength"

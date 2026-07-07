@@ -1,0 +1,6 @@
+.claude/
+.agents/
+.codex/
+Smartload2.pdf
+*.tgz
+node_modules/
