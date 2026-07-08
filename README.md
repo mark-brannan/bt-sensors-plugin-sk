@@ -4,6 +4,7 @@
 
 # Version 1.3.8.beta10
 - Add Cyclops Marine Smartload Bluetooth load sensor support.
+- Fix JKBMS configuration regression error 
 
 # Version 1.3.8.beta9
 - Discard invalid/garbage Victron advertisements (device-state 0xFF, key mismatch, duplicate IV).
@@ -13,6 +14,7 @@
 - Retry Bluetooth adapter acquisition instead of failing immediately.
 - Revert previous path name rewrite
 - Sanitize macAndName value only
+- Add Cyclops Marine Smartload Bluetooth load sensor support.
 
 # Version 1.3.8.beta8
 

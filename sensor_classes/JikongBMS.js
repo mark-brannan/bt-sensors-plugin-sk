@@ -124,7 +124,7 @@ class JikongBMS extends BTSensor {
     this.addParameter("dischargeFloor", {
       description: "Discharge floor ratio ",
       isRequired: true,
-      type: "ratio",
+      type: "number",
       default: 0.1,
       minimum: 0,
       max: 0.99,
