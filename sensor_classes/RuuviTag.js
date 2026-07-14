@@ -19,10 +19,9 @@ class RuuviTag extends BTSensor{
             this.mode = md[0]
             if (this['_initModeV'+this.mode])
                 this['_initModeV'+this.mode]()
+            else    
+                throw new Error("Unrecognized Ruuvitag data mode "+md[0])
         }
-        else    
-            throw new Error("Unrecognized Ruuvitag data mode "+md[0])
-
     } 
 
 /**
