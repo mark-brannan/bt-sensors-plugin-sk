@@ -9,19 +9,20 @@ class RuuviTag extends BTSensor{
         else
             return null
     }    
-        
+    mode=5
     initSchema(){
         super.initSchema()
         this.addDefaultParam("zone")
 
-        const md = this.valueIfVariant(this.getManufacturerData(this.constructor.manufacturerID))
+        const md = this.getManufacturerData(this.constructor.manufacturerID)
         if (md) {
             this.mode = md[0]
             if (this['_initModeV'+this.mode])
                 this['_initModeV'+this.mode]()
             else    
-                throw new Error("Unrecognized Ruuvitag data mode "+md[0])
-        }
+                throw new Error("Unrecognized Ruuvitag data mode "+this.mode)
+        } else
+            throw new Error("No Manufacturer Data for RuuviTag. Can't determine version mode.")    
     } 
 
 /**
