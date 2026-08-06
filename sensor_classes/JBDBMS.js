@@ -109,7 +109,7 @@ class JBDBMS extends BTSensor {
 
     this.addMetadatum("protectionStatus", "", "Protection Status", (buffer) => {
       const word = buffer.readUInt16BE(20);
-      return {
+      const status = {
         singleCellOvervolt:       (word & 0x0001) !== 0,
         singleCellUndervolt:      (word & 0x0002) !== 0,
         packOvervolt:             (word & 0x0004) !== 0,
@@ -180,15 +180,15 @@ class JBDBMS extends BTSensor {
       }
     }
 
-    if (this.numberOfTemps > 0) {
+    for (let i = 0; i < this.numberOfTemps; i++) {
       this.addMetadatum(
-        "temperature",
+        `temp${i}`,
         "K",
-        "battery temperature",
+        `Temperature${i + 1} reading`,
         (buffer) => {
-          return buffer.readUInt16BE(27) / 10;
+          return buffer.readUInt16BE(27 + i * 2) / 10;
         }
-      ).default = "electrical.batteries.{batteryID}.temperature";
+      ).default = `electrical.batteries.{batteryID}.Temperature${i + 1}`;
     }
 
     for (let i = 0; i < this.numberOfCells; i++) {
