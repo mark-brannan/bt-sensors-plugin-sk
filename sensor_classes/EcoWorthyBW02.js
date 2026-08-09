@@ -90,7 +90,7 @@ class EcoWorthyBW02 extends BTSensor {
         //.read=(buffer)=>{return (buffer.readUInt16BE(8) / 100)*3600} 
       
       this.addDefaultPath('capacity','electrical.batteries.capacity.actual')
-        .read=(buffer)=>{return (buffer.readUInt16BE(26) / 100)*3600} 
+        .read=(buffer)=>{return (buffer.readUInt16BE(26) / 100) * (buffer.readUInt16BE(20) / 100) * 3600} 
      
         this.addDefaultPath('SOC','electrical.batteries.capacity.stateOfCharge')
         .read=(buffer)=>{return buffer.readUInt16BE(16)/100} 
@@ -103,7 +103,7 @@ class EcoWorthyBW02 extends BTSensor {
       for (let i=0; i<this.numberOfTemps; i++){
         this.addMetadatum(`temp${i}`, 'K', `Temperature${i+1} reading`,
           (buffer)=>{
-            return buffer.readUInt16BE(82+(i*2))/10
+            return buffer.readInt16BE(82+(i*2))/10 + 273.15
           })
          .default=`electrical.batteries.{batteryID}.Temperature${i+1}`
       }
@@ -140,11 +140,11 @@ class EcoWorthyBW02 extends BTSensor {
               this.numberOfTemps=buffer[81]
             }
             for (let i=0;i<this.numberOfCells;i++){
-              this.emitData(`cell${i+1}Voltage`, buffer)
+              this.emitData(`cell${i}Voltage`, buffer)
             }
             for (let i=0;i<this.numberOfTemps;i++){
-              this.emitData(`temp${i+1}`, buffer)
-                      
+              this.emitData(`temp${i}`, buffer)
+
             }    
           }
       })
