@@ -30,7 +30,7 @@ class Aranet2 extends AranetSensor{
             this.addDefaultPath('relativeHumidity','environment.relativeHumidity')
             .read=(buff)=>{return ((buff.readUInt16LE(8))/10000)}
                 
-            this.addDefaultPath("battery","sensors.batteryStrength")   
+            this.addDefaultPath("batteryStrength","sensors.batteryStrength")   
                 .read=(buff)=>{return ((buff.readUInt8(12))/100)}
 
     }
@@ -40,9 +40,9 @@ class Aranet2 extends AranetSensor{
 
         const buff = this.getManufacturerData(0x0702)
         this.emitData("temp", buff)
-        this.emitData("humidity", buff)
+        this.emitData("relativeHumidity", buff)
         this.emitData("pressure", buff)
-        this.emitData("battery", buff)
+        this.emitData("batteryStrength", buff)
         
     }       
     static ImageFile= "Aranet2.webp" 

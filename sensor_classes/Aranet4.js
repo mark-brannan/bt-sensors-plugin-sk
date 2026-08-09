@@ -37,7 +37,7 @@ class Aranet4 extends AranetSensor{
             (buff)=>{return this.COLOR[buff.readUInt8(16)]})
             .default="environment.{zone}.warningColor"
         
-        this.addDefaultPath("battery","sensors.batteryStrength")   
+        this.addDefaultPath("batteryStrength","sensors.batteryStrength")   
             .read=(buff)=>{return ((buff.readUInt8(15))/100)}
 
                     
