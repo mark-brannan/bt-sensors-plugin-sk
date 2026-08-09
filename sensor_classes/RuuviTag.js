@@ -9,20 +9,24 @@ class RuuviTag extends BTSensor{
         else
             return null
     }    
-    mode=5
+    
     initSchema(){
         super.initSchema()
         this.addDefaultParam("zone")
-
-        const md = this.getManufacturerData(this.constructor.manufacturerID)
-        if (md) {
-            this.mode = md[0]
-            if (this['_initModeV'+this.mode])
-                this['_initModeV'+this.mode]()
-            else    
-                throw new Error("Unrecognized Ruuvitag data mode "+this.mode)
-        } else
-            throw new Error("No Manufacturer Data for RuuviTag. Can't determine version mode.")    
+        if (this.mode===undefined) {
+            const md = this.getManufacturerData(this.constructor.manufacturerID)
+            if (md && md.length>0) 
+                this.mode = md[0]
+            else   
+                {
+                    this.mode = 5
+                    this.setError("Can't determine Ruuvitag data mode. Defaulting to 5.")
+                }     
+        }
+        if (this['_initModeV'+this.mode])
+            this['_initModeV'+this.mode]()
+        else 
+            this.setError(`Unsupported Ruuvitag data mode ${this.mode}`)   
     } 
 
 /**
@@ -123,5 +127,9 @@ Offset	Allowed values	Description
             this.emitValuesFrom( this.getManufacturerData(this.constructor.manufacturerID) )
     }
 
+    prepareConfig(config){
+        super.prepareConfig(config)
+        config.params.mode=this.mode
+    }
 }
 module.exports=RuuviTag
