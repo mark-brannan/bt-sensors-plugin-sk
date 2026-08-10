@@ -2,6 +2,13 @@
 
 ## WHAT'S NEW  
 
+# Version 1.3.8.beta11
+- Add runtime variables to BTSensor notifications.
+- Normalize Aranet batteryStrength tags.
+- Fix RuuviTag timeout and reduce log spam.
+- Add Gobius Pro binary tank level sensor support.
+- Fix ECO-WORTHY BW02 telemetry bugs: energy units, temperature handling, and indexing.
+
 # Version 1.3.8.beta10
 - Add Cyclops Marine Smartload Bluetooth load sensor support.
 - Fix JKBMS configuration regression error 
