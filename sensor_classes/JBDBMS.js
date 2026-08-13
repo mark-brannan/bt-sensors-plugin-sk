@@ -188,7 +188,14 @@ class JBDBMS extends BTSensor {
         (buffer) => {
           return buffer.readUInt16BE(27 + i * 2) / 10;
         }
-      ).default = `electrical.batteries.{batteryID}.Temperature${i + 1}`;
+      ).default =
+        i === 0
+          ? // The pack's primary sensor goes on the standard SignalK battery
+            // temperature path, the one consumers actually read, matching
+            // EctiveBMS and HumsienkBMS. Any additional sensors follow
+            // WattCycleBMS's multi-sensor naming.
+            "electrical.batteries.{batteryID}.temperature"
+          : `electrical.batteries.{batteryID}.Temperature${i + 1}`;
     }
 
     for (let i = 0; i < this.numberOfCells; i++) {
@@ -438,3 +445,6 @@ class JBDBMS extends BTSensor {
 }
 
 module.exports = JBDBMS;
+// Exposed so spec/jbdbms_real_frame.test.js can exercise the real checksum
+// against a captured frame instead of re-implementing it.
+module.exports.checkSum = checkSum;
