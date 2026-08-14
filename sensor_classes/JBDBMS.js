@@ -109,7 +109,7 @@ class JBDBMS extends BTSensor {
 
     this.addMetadatum("protectionStatus", "", "Protection Status", (buffer) => {
       const word = buffer.readUInt16BE(20);
-      return {
+      const status = {
         singleCellOvervolt:       (word & 0x0001) !== 0,
         singleCellUndervolt:      (word & 0x0002) !== 0,
         packOvervolt:             (word & 0x0004) !== 0,
@@ -180,15 +180,30 @@ class JBDBMS extends BTSensor {
       }
     }
 
-    if (this.numberOfTemps > 0) {
+    for (let i = 0; i < this.numberOfTemps; i++) {
       this.addMetadatum(
-        "temperature",
+        `temp${i}`,
         "K",
-        "battery temperature",
+        `Temperature${i + 1} reading`,
         (buffer) => {
-          return buffer.readUInt16BE(27) / 10;
+          // Believe the frame's own sensor count over the configured one.
+          // When the startup probe fails, the fallback above assumes two
+          // sensors; a pack that reports one would otherwise publish the
+          // zeroed bytes that follow as 0 K -- roughly -273 C -- and it
+          // looks like a real reading downstream.
+          const declared = buffer.length > 26 ? buffer.readUInt8(26) : 0;
+          if (i >= declared) return null;
+          if (buffer.length < 27 + i * 2 + 2) return null;
+          return buffer.readUInt16BE(27 + i * 2) / 10;
         }
-      ).default = "electrical.batteries.{batteryID}.temperature";
+      ).default =
+        i === 0
+          ? // The pack's primary sensor goes on the standard SignalK battery
+            // temperature path, the one consumers actually read, matching
+            // EctiveBMS and HumsienkBMS. Any additional sensors follow
+            // WattCycleBMS's multi-sensor naming.
+            "electrical.batteries.{batteryID}.temperature"
+          : `electrical.batteries.{batteryID}.Temperature${i + 1}`;
     }
 
     for (let i = 0; i < this.numberOfCells; i++) {
@@ -438,3 +453,6 @@ class JBDBMS extends BTSensor {
 }
 
 module.exports = JBDBMS;
+// Exposed so spec/jbdbms_real_frame.test.js can exercise the real checksum
+// against a captured frame instead of re-implementing it.
+module.exports.checkSum = checkSum;
