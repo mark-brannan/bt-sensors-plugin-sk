@@ -125,10 +125,35 @@ test("registers every sensor on a multi-probe pack, each at its own offset", asy
 
   // Second probe reads two bytes further into the frame.
   const framed = Buffer.from(REAL_FRAME);
+  framed.writeUInt8(2, 26); // frame declares two sensors
   framed.writeUInt16BE(3000, 27);
   framed.writeUInt16BE(2900, 29);
   assert.equal(sensor.getPath("temp0").read(framed), 300);
   assert.equal(sensor.getPath("temp1").read(framed), 290);
+});
+
+// initSchema falls back to two sensors when its startup GATT probe fails,
+// which happens on this vessel. Without a guard the extra sensor reads the
+// zeroed bytes past the real one and publishes 0 K -- about -273 C -- which
+// looks like a genuine reading to anything consuming the path.
+test("ignores temperature sensors the frame does not declare", async () => {
+  const sensor = await buildSensor({ temps: 2 });
+
+  assert.equal(REAL_FRAME.readUInt8(26), 1, "this pack declares one sensor");
+  assert.equal(sensor.getPath("temp0").read(REAL_FRAME), 297.6);
+  assert.equal(
+    sensor.getPath("temp1").read(REAL_FRAME),
+    null,
+    "must not publish the zeroed tail as 0 K"
+  );
+});
+
+test("survives a frame truncated mid-temperature", async () => {
+  const sensor = await buildSensor({ temps: 2 });
+
+  const short = Buffer.from(REAL_FRAME.subarray(0, 28));
+  assert.equal(sensor.getPath("temp0").read(short), null);
+  assert.equal(sensor.getPath("temp1").read(short), null);
 });
 
 test("temperature reaches a subscriber end to end", async () => {

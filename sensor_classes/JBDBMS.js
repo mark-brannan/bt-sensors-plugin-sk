@@ -186,6 +186,14 @@ class JBDBMS extends BTSensor {
         "K",
         `Temperature${i + 1} reading`,
         (buffer) => {
+          // Believe the frame's own sensor count over the configured one.
+          // When the startup probe fails, the fallback above assumes two
+          // sensors; a pack that reports one would otherwise publish the
+          // zeroed bytes that follow as 0 K -- roughly -273 C -- and it
+          // looks like a real reading downstream.
+          const declared = buffer.length > 26 ? buffer.readUInt8(26) : 0;
+          if (i >= declared) return null;
+          if (buffer.length < 27 + i * 2 + 2) return null;
           return buffer.readUInt16BE(27 + i * 2) / 10;
         }
       ).default =
