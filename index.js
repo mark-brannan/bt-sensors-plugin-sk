@@ -3,7 +3,13 @@ const packageInfo = require("./package.json")
 
 const {createBluetooth} = require('@naugehyde/node-ble')
 const {Variant} = require('@jellybrick/dbus-next')
-const {bluetooth, destroy} = createBluetooth()
+// createBluetooth() opens a D-Bus socket and runs the SASL handshake
+// synchronously. It used to run here, at module load -- i.e. during
+// SignalK's plugin-load sweep, before the plugin has any way to react if
+// the handshake dies (dbus-daemon's auth_timeout is 30s and the sweep can
+// starve the event loop past it). It's now created lazily, from inside
+// plugin.start(), via getBluetoothSession() below, and rebuilt on error
+// instead of leaving a dead bus for the life of the process.
 
 const BTSensor = require('./BTSensor.js')
 const BLACKLISTED = require('./sensor_classes/BlackListedDevice.js')
@@ -196,9 +202,62 @@ module.exports =   function (app) {
 
 	
 	plugin.started=false
-	
+
 	var discoveryIntervalID, progressID, progressTimeoutID, deviceHealthID
-	var adapter 
+	var adapter
+
+	// Lazy, memoizing D-Bus session. Nothing calls createBluetooth() until
+	// getBluetoothSession() is first invoked (from plugin.start()), and the
+	// memo is cleared -- so the next call rebuilds it -- whenever the bus
+	// reports an error, instead of leaving a dead connection in place for
+	// the rest of the process's life.
+	var btSession = null
+	var btReconnectTimeoutID = null
+	const BT_RECONNECT_BASE_DELAY_MS = 3000
+	const BT_RECONNECT_MAX_DELAY_MS = 60000
+	var btReconnectAttempt = 0
+	var lastStartOptions = {}
+	var lastRestartPlugin = null
+
+	function getBluetoothSession(){
+		if (btSession) return btSession
+
+		const { bluetooth, destroy } = createBluetooth()
+		btSession = { bluetooth, destroy }
+
+		// dbus-next's Bus is an EventEmitter and emits 'error' on a dead
+		// or dropped connection (the EPIPE case this fix exists for, and
+		// any later mid-life drop). Without this listener an 'error' event
+		// with no listeners throws and crashes the process.
+		bluetooth.dbus.on('error', (err) => {
+			plugin.debug(`D-Bus connection error: ${err?.message ?? err}`)
+			if (btSession && btSession.bluetooth === bluetooth) btSession = null
+			adapter = null
+			scheduleBluetoothReconnect()
+		})
+
+		btReconnectAttempt = 0
+		return btSession
+	}
+
+	function scheduleBluetoothReconnect(){
+		if (btReconnectTimeoutID || plugin.stopped) return
+		const delay = Math.min(
+			BT_RECONNECT_BASE_DELAY_MS * (2 ** btReconnectAttempt),
+			BT_RECONNECT_MAX_DELAY_MS
+		)
+		btReconnectAttempt++
+		plugin.setStatusText(`Bluetooth D-Bus connection lost, reconnecting in ${delay/1000}s...`)
+		btReconnectTimeoutID = setTimeout(async () => {
+			btReconnectTimeoutID = null
+			try {
+				await plugin.start(lastStartOptions, lastRestartPlugin)
+			} catch (e) {
+				plugin.setError(`Error reconnecting to Bluetooth: ${e.message}`)
+				scheduleBluetoothReconnect()
+			}
+		}, delay)
+	}
 	const channel = createChannel()
 	
 	plugin.debug(`Loading plugin ${packageInfo.version}`)
@@ -209,6 +268,10 @@ module.exports =   function (app) {
 	const classMap = loadClassMap(app)
 
 		plugin.started=true
+		plugin.stopped=false
+		lastStartOptions = options
+		lastRestartPlugin = restartPlugin
+		const { bluetooth } = getBluetoothSession()
 		var adapterID=options.adapter
 		var foundConfiguredDevices=0
 
@@ -887,6 +950,10 @@ module.exports =   function (app) {
 		plugin.debug("Stopping plugin")
 		plugin.stopped=true
 		plugin.started=false
+		if (btReconnectTimeoutID) {
+			clearTimeout(btReconnectTimeoutID)
+			btReconnectTimeoutID=null
+		}
 		channel.broadcast({state:"stopped"},"pluginstate")
 		if (discoveryIntervalID) {
 			clearInterval(discoveryIntervalID)
